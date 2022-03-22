@@ -168,8 +168,10 @@ static void release_bus(slot_info_t *slot)
         .length = 8,
         .tx_data = {0xff}
     };
-    spi_device_polling_transmit(slot->spi_handle, &t);
-    // don't care if this failed
+    esp_err_t ret = spi_device_polling_transmit(slot->spi_handle, &t);
+    if (ESP_OK != ret) {
+        ESP_LOGE(TAG, "Error in release_bus %s", esp_err_to_name(ret));
+    }
 }
 
 /// Clock out 80 cycles (10 bytes) before GO_IDLE command
@@ -183,8 +185,10 @@ static void go_idle_clockout(slot_info_t *slot)
         .tx_buffer = data,
         .rx_buffer = data,
     };
-    spi_device_polling_transmit(slot->spi_handle, &t);
-    // don't care if this failed
+    esp_err_t ret = spi_device_polling_transmit(slot->spi_handle, &t);
+    if (ESP_OK != ret) {
+        ESP_LOGE(TAG, "Error in go_idle_clockout %s", esp_err_to_name(ret));
+    }
 }
 
 /**
@@ -320,7 +324,7 @@ esp_err_t sdspi_host_init_device(const sdspi_device_config_t* slot_config, sdspi
     // Attach the SD card to the SPI bus
     esp_err_t ret = configure_spi_dev(slot, SDMMC_FREQ_PROBING * 1000);
     if (ret != ESP_OK) {
-        ESP_LOGD(TAG, "spi_bus_add_device failed with rc=0x%x", ret);
+        ESP_LOGE(TAG, "spi_bus_add_device failed with rc=0x%x", ret);
         goto cleanup;
     }
 
@@ -333,7 +337,7 @@ esp_err_t sdspi_host_init_device(const sdspi_device_config_t* slot_config, sdspi
 
     ret = gpio_config(&io_conf);
     if (ret != ESP_OK) {
-        ESP_LOGD(TAG, "gpio_config (CS) failed with rc=0x%x", ret);
+        ESP_LOGE(TAG, "gpio_config (CS) failed with rc=0x%x", ret);
         goto cleanup;
     }
     cs_high(slot);
@@ -362,7 +366,7 @@ esp_err_t sdspi_host_init_device(const sdspi_device_config_t* slot_config, sdspi
     if (io_conf.pin_bit_mask != 0) {
         ret = gpio_config(&io_conf);
         if (ret != ESP_OK) {
-            ESP_LOGD(TAG, "gpio_config (CD/WP) failed with rc=0x%x", ret);
+            ESP_LOGE(TAG, "gpio_config (CD/WP) failed with rc=0x%x", ret);
             goto cleanup;
         }
     }
@@ -435,6 +439,13 @@ esp_err_t sdspi_host_start_command(sdspi_dev_handle_t handle, sdspi_hw_cmd_t *cm
     ESP_LOGV(TAG, "%s: slot=%i, CMD%d, arg=0x%08x flags=0x%x, data=%p, data_size=%i crc=0x%02x",
              __func__, handle, cmd_index, cmd_arg, flags, data, data_size, cmd->crc7);
 
+    esp_err_t ret = ESP_OK;
+
+    ret = spi_device_acquire_bus(slot->spi_handle, portMAX_DELAY);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Error acquiring SPI bus %s", esp_err_to_name(ret));
+        ret = ESP_OK;
+    }
 
     // For CMD0, clock out 80 cycles to help the card enter idle state,
     // *before* CS is asserted.
@@ -442,9 +453,6 @@ esp_err_t sdspi_host_start_command(sdspi_dev_handle_t handle, sdspi_hw_cmd_t *cm
         go_idle_clockout(slot);
     }
     // actual transaction
-    esp_err_t ret = ESP_OK;
-
-    spi_device_acquire_bus(slot->spi_handle, portMAX_DELAY);
     cs_low(slot);
     if (flags & SDSPI_CMD_FLAG_DATA) {
         const bool multi_block = flags & SDSPI_CMD_FLAG_MULTI_BLK;
@@ -460,18 +468,19 @@ esp_err_t sdspi_host_start_command(sdspi_dev_handle_t handle, sdspi_hw_cmd_t *cm
     }
     cs_high(slot);
 
-    release_bus(slot);
-    spi_device_release_bus(slot->spi_handle);
-
     if (ret != ESP_OK) {
-        ESP_LOGD(TAG, "%s: cmd=%d error=0x%x", __func__, cmd_index, ret);
+        ESP_LOGE(TAG, "%s: cmd=%d error=0x%x %s", __func__, cmd_index, ret, esp_err_to_name(ret));
     } else {
+        release_bus(slot);
         // Update internal state when some commands are sent successfully
         if (cmd_index == SD_CRC_ON_OFF) {
             slot->data_crc_enabled = (uint8_t) cmd_arg;
             ESP_LOGD(TAG, "data CRC set=%d", slot->data_crc_enabled);
         }
     }
+
+    spi_device_release_bus(slot->spi_handle);
+
     return ret;
 }
 
@@ -506,7 +515,7 @@ static esp_err_t start_command_default(slot_info_t *slot, int flags, sdspi_hw_cm
         cmd->r1 = 0xff;
     }
     if (ret != ESP_OK) {
-        ESP_LOGD(TAG, "%s: spi_device_polling_transmit returned 0x%x", __func__, ret);
+        ESP_LOGE(TAG, "%s: spi_device_polling_transmit returned failure 0x%x", __func__, ret);
         return ret;
     }
     if (flags & SDSPI_CMD_FLAG_NORSP) {
@@ -552,7 +561,7 @@ static esp_err_t poll_busy(slot_info_t *slot, int timeout_ms, bool polling)
             }
         }
     } while(esp_timer_get_time() < t_end);
-    ESP_LOGD(TAG, "%s: timeout", __func__);
+    ESP_LOGE(TAG, "%s: timeout", __func__);
     return ESP_ERR_TIMEOUT;
 }
 
@@ -594,7 +603,7 @@ static esp_err_t poll_data_token(slot_info_t *slot, uint8_t *extra_ptr, size_t *
             return ESP_OK;
         }
     } while (esp_timer_get_time() < t_end);
-    ESP_LOGD(TAG, "%s: timeout", __func__);
+    ESP_LOGE(TAG, "%s: timeout", __func__);
     return ESP_ERR_TIMEOUT;
 }
 
