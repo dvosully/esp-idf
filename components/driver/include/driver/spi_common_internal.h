@@ -11,6 +11,7 @@
 #include <esp_intr_alloc.h>
 #include "driver/spi_common.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "hal/spi_types.h"
 #include "esp_pm.h"
 
@@ -67,6 +68,7 @@ typedef struct {
 #ifdef CONFIG_PM_ENABLE
     esp_pm_lock_handle_t pm_lock;   ///< Power management lock
 #endif
+    SemaphoreHandle_t mutex;    ///< mutex to achive bus thread-safe
 } spi_bus_attr_t;
 
 /// Destructor called when a bus is deinitialized.

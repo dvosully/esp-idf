@@ -790,17 +790,26 @@ esp_err_t SPI_MASTER_ATTR spi_device_queue_trans(spi_device_handle_t handle, spi
 
     spi_host_t *host = handle->host;
 
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreTakeRecursive(host->bus_attr->mutex, ticks_to_wait)) {
+            ESP_LOGE(SPI_TAG, "Error getting semaphore in spi_device_queue_trans");
+            return ESP_ERR_TIMEOUT;
+        }
+    }
     SPI_CHECK(!spi_bus_device_is_polling(handle), "Cannot queue new transaction while previous polling transaction is not terminated.", ESP_ERR_INVALID_STATE );
 
     /* Even when using interrupt transfer, the CS can only be kept activated if the bus has been
      * acquired with `spi_device_acquire_bus()` first. */
     if (host->device_acquiring_lock != handle && (trans_desc->flags & SPI_TRANS_CS_KEEP_ACTIVE)) {
-        return ESP_ERR_INVALID_ARG;
+        ret = ESP_ERR_INVALID_ARG;
+        goto clean_up;
     }
 
     spi_trans_priv_t trans_buf;
     ret = setup_priv_desc(trans_desc, &trans_buf, (host->bus_attr->dma_enabled));
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK) {
+        goto clean_up;
+    }
 
 #ifdef CONFIG_PM_ENABLE
     esp_pm_lock_acquire(host->bus_attr->pm_lock);
@@ -822,9 +831,20 @@ esp_err_t SPI_MASTER_ATTR spi_device_queue_trans(spi_device_handle_t handle, spi
     if (ret != ESP_OK) {
         goto clean_up;
     }
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+            ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_queue_trans");
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
     return ESP_OK;
 
 clean_up:
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+            ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_queue_trans");
+        }
+    }
     uninstall_priv_desc(&trans_buf);
     return ret;
 }
@@ -834,10 +854,22 @@ esp_err_t SPI_MASTER_ATTR spi_device_get_trans_result(spi_device_handle_t handle
     BaseType_t r;
     spi_trans_priv_t trans_buf;
     SPI_CHECK(handle!=NULL, "invalid dev handle", ESP_ERR_INVALID_ARG);
+    spi_host_t *host = handle->host;
 
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreTakeRecursive(host->bus_attr->mutex, ticks_to_wait)) {
+            ESP_LOGE(SPI_TAG, "Error getting semaphore in spi_device_get_trans_result");
+            return ESP_ERR_TIMEOUT;
+        }
+    }
     //use the interrupt, block until return
     r=xQueueReceive(handle->ret_queue, (void*)&trans_buf, ticks_to_wait);
     if (!r) {
+        if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+            if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+                ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_get_trans_result");
+            }
+        }
         // The memory occupied by rx and tx DMA buffer destroyed only when receiving from the queue (transaction finished).
         // If timeout, wait and retry.
         // Every in-flight transaction request occupies internal memory as DMA buffer if needed.
@@ -847,6 +879,12 @@ esp_err_t SPI_MASTER_ATTR spi_device_get_trans_result(spi_device_handle_t handle
     uninstall_priv_desc(&trans_buf);
     (*trans_desc) = trans_buf.trans;
 
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+            ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_get_trans_result");
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
     return ESP_OK;
 }
 
@@ -855,15 +893,40 @@ esp_err_t SPI_MASTER_ATTR spi_device_transmit(spi_device_handle_t handle, spi_tr
 {
     esp_err_t ret;
     spi_transaction_t *ret_trans;
+    spi_host_t *host = handle->host;
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreTakeRecursive(host->bus_attr->mutex, portMAX_DELAY)) {
+            ESP_LOGE(SPI_TAG, "Error getting semaphore in spi_device_transmit");
+            return ESP_ERR_TIMEOUT;
+        }
+    }
     //ToDo: check if any spi transfers in flight
     ret = spi_device_queue_trans(handle, trans_desc, portMAX_DELAY);
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK) {
+        goto clean_up;
+    }
 
     ret = spi_device_get_trans_result(handle, &ret_trans, portMAX_DELAY);
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK) {
+        goto clean_up;
+    }
 
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+            ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_transmit");
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
     assert(ret_trans == trans_desc);
     return ESP_OK;
+
+clean_up:
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+            ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_transmit");
+        }
+    }
+    return ret;
 }
 
 esp_err_t SPI_MASTER_ISR_ATTR spi_device_acquire_bus(spi_device_t *device, TickType_t wait)
@@ -872,7 +935,14 @@ esp_err_t SPI_MASTER_ISR_ATTR spi_device_acquire_bus(spi_device_t *device, TickT
     SPI_CHECK(wait==portMAX_DELAY, "acquire finite time not supported now.", ESP_ERR_INVALID_ARG);
     SPI_CHECK(!spi_bus_device_is_polling(device), "Cannot acquire bus when a polling transaction is in progress.", ESP_ERR_INVALID_STATE );
 
-    esp_err_t ret = spi_bus_lock_acquire_start(device->dev_lock, wait);
+    esp_err_t ret = ESP_OK;
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreTakeRecursive(host->bus_attr->mutex, wait)) {
+            ESP_LOGE(SPI_TAG, "Error getting semaphore in spi_device_acquire_bus");
+            return ret;
+        }
+    }
+    ret = spi_bus_lock_acquire_start(device->dev_lock, wait);
     if (ret != ESP_OK) {
         return ret;
     }
@@ -920,6 +990,11 @@ void SPI_MASTER_ISR_ATTR spi_device_release_bus(spi_device_t *dev)
 
     host->device_acquiring_lock = NULL;
     esp_err_t ret = spi_bus_lock_acquire_end(dev->dev_lock);
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+            ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_release_bus");
+        }
+    }
     assert(ret == ESP_OK);
     (void) ret;
 }
@@ -930,12 +1005,18 @@ esp_err_t SPI_MASTER_ISR_ATTR spi_device_polling_start(spi_device_handle_t handl
     SPI_CHECK(ticks_to_wait == portMAX_DELAY, "currently timeout is not available for polling transactions", ESP_ERR_INVALID_ARG);
     ret = check_trans_valid(handle, trans_desc);
     if (ret!=ESP_OK) return ret;
+    spi_host_t *host = handle->host;
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreTakeRecursive(host->bus_attr->mutex, ticks_to_wait)) {
+            ESP_LOGE(SPI_TAG, "Error getting semaphore in spi_device_polling_start");
+            return ESP_ERR_TIMEOUT;
+        }
+    }
     SPI_CHECK(!spi_bus_device_is_polling(handle), "Cannot send polling transaction while the previous polling transaction is not terminated.", ESP_ERR_INVALID_STATE );
 
     /* If device_acquiring_lock is set to handle, it means that the user has already
      * acquired the bus thanks to the function `spi_device_acquire_bus()`.
      * In that case, we don't need to take the lock again. */
-    spi_host_t *host = handle->host;
     if (host->device_acquiring_lock != handle) {
         /* The user cannot ask for the CS to keep active has the bus is not locked/acquired. */
         if ((trans_desc->flags & SPI_TRANS_CS_KEEP_ACTIVE) != 0) {
@@ -946,10 +1027,14 @@ esp_err_t SPI_MASTER_ISR_ATTR spi_device_polling_start(spi_device_handle_t handl
     } else {
         ret = spi_bus_lock_wait_bg_done(handle->dev_lock, ticks_to_wait);
     }
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK) {
+        goto clean_up;
+    }
 
     ret = setup_priv_desc(trans_desc, &host->cur_trans_buf, (host->bus_attr->dma_enabled));
-    if (ret!=ESP_OK) return ret;
+    if (ret!=ESP_OK) {
+        goto clean_up;
+    }
 
     //Polling, no interrupt is used.
     host->polling = true;
@@ -957,7 +1042,21 @@ esp_err_t SPI_MASTER_ISR_ATTR spi_device_polling_start(spi_device_handle_t handl
     ESP_LOGV(SPI_TAG, "polling trans");
     spi_new_trans(handle, &host->cur_trans_buf);
 
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+            ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_polling_start");
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
     return ESP_OK;
+
+clean_up:
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+            ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_polling_start");
+        }
+    }
+    return ret;
 }
 
 esp_err_t SPI_MASTER_ISR_ATTR spi_device_polling_end(spi_device_handle_t handle, TickType_t ticks_to_wait)
@@ -968,10 +1067,21 @@ esp_err_t SPI_MASTER_ISR_ATTR spi_device_polling_end(spi_device_handle_t handle,
     assert(host->cur_cs == handle->id);
     assert(handle == get_acquiring_dev(host));
 
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreTakeRecursive(host->bus_attr->mutex, ticks_to_wait)) {
+            ESP_LOGE(SPI_TAG, "Error getting semaphore in spi_device_polling_end");
+            return ESP_ERR_TIMEOUT;
+        }
+    }
     TickType_t start = xTaskGetTickCount();
     while (!spi_hal_usr_is_done(&host->hal)) {
         TickType_t end = xTaskGetTickCount();
         if (end - start > ticks_to_wait) {
+            if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+                if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+                    ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_polling_end");
+                }
+            }
             return ESP_ERR_TIMEOUT;
         }
     }
@@ -988,17 +1098,47 @@ esp_err_t SPI_MASTER_ISR_ATTR spi_device_polling_end(spi_device_handle_t handle,
      * In that case, the lock must not be released now because . */
     if (host->device_acquiring_lock != handle) {
         assert(host->device_acquiring_lock == NULL);
-        spi_bus_lock_acquire_end(handle->dev_lock);
+        esp_err_t ret = spi_bus_lock_acquire_end(handle->dev_lock);
+        if (ESP_OK != ret) {
+            ESP_LOGE(SPI_TAG, "Error releasing lock in spi_device_polling_end");
+        }
     }
 
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+            ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_polling_end");
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
     return ESP_OK;
 }
 
 esp_err_t SPI_MASTER_ISR_ATTR spi_device_polling_transmit(spi_device_handle_t handle, spi_transaction_t* trans_desc)
 {
     esp_err_t ret;
+    spi_host_t *host = handle->host;
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreTakeRecursive(host->bus_attr->mutex, portMAX_DELAY)) {
+            ESP_LOGE(SPI_TAG, "Error getting semaphore in spi_device_polling_transmit");
+            return ESP_ERR_TIMEOUT;
+        }
+    }
     ret = spi_device_polling_start(handle, trans_desc, portMAX_DELAY);
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK) {
+        if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+            if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+                ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_polling_transmit");
+            }
+        }
+        return ret;
+    }
 
-    return spi_device_polling_end(handle, portMAX_DELAY);
+    ret = spi_device_polling_end(handle, portMAX_DELAY);
+    if (host->bus_attr->bus_cfg.flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        if (pdTRUE != xSemaphoreGiveRecursive(host->bus_attr->mutex)) {
+            ESP_LOGE(SPI_TAG, "Error releasing semaphore in spi_device_polling_transmit");
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
+    return ret;
 }

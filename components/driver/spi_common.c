@@ -54,6 +54,7 @@ static const char *SPI_TAG = "spi";
             .rx_dma_chan = 0, \
             .max_transfer_sz = SOC_SPI_MAXIMUM_BUFFER_SIZE, \
             .dma_desc_num= 0, \
+            .mutex= NULL, \
         }, \
     }
 
@@ -558,7 +559,7 @@ esp_err_t spicommon_bus_initialize_io(spi_host_device_t host, const spi_bus_conf
     }
 
     uint32_t missing_flag = flags & ~temp_flag;
-    missing_flag &= ~SPICOMMON_BUSFLAG_MASTER;//don't check this flag
+    missing_flag &= ~SPICOMMON_BUSFLAG_MASTER & ~SPICOMMON_BUSFLAG_MUTEX_LOCK;//don't check this flag
 
     if (missing_flag != 0) {
     //check pins existence
@@ -779,6 +780,16 @@ esp_err_t spi_bus_initialize(spi_host_device_t host_id, const spi_bus_config_t *
     ctx->host_id = host_id;
     bus_attr = &ctx->bus_attr;
     bus_attr->bus_cfg = *bus_config;
+    if (bus_config->flags & SPICOMMON_BUSFLAG_MUTEX_LOCK) {
+        bus_attr->mutex = xSemaphoreCreateRecursiveMutex();
+        ESP_LOGV(SPI_TAG, "Recursive semaphore created");
+        if (bus_attr->mutex == NULL) {
+            err = ESP_ERR_NO_MEM;
+            goto cleanup;
+        }
+    } else {
+        bus_attr->mutex = NULL;
+    }
 
     if (dma_chan != SPI_DMA_DISABLED) {
         bus_attr->dma_enabled = 1;
@@ -846,6 +857,8 @@ cleanup:
         if (bus_attr->dma_enabled) {
             dma_chan_free(host_id);
         }
+        vSemaphoreDelete(bus_attr->mutex);
+        bus_attr->mutex = NULL;
     }
     spicommon_periph_free(host_id);
     free(bus_ctx[host_id]);
@@ -884,6 +897,8 @@ esp_err_t spi_bus_free(spi_host_device_t host_id)
         dma_chan_free(host_id);
     }
     spicommon_periph_free(host_id);
+    vSemaphoreDelete(bus_attr->mutex);
+    bus_attr->mutex = NULL;
     free(ctx);
     bus_ctx[host_id] = NULL;
     return err;
