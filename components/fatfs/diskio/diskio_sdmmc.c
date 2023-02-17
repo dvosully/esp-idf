@@ -49,7 +49,7 @@ DRESULT ff_sdmmc_read (BYTE pdrv, BYTE* buff, DWORD sector, UINT count)
     assert(card);
     esp_err_t err = sdmmc_read_sectors(card, buff, sector, count);
     if (unlikely(err != ESP_OK)) {
-        ESP_LOGE(TAG, "sdmmc_read_blocks failed (%d)", err);
+        ESP_LOGE(TAG, "sdmmc_read_blocks failed %s", esp_err_to_name(err));
         return RES_ERROR;
     }
     return RES_OK;
@@ -61,7 +61,7 @@ DRESULT ff_sdmmc_write (BYTE pdrv, const BYTE* buff, DWORD sector, UINT count)
     assert(card);
     esp_err_t err = sdmmc_write_sectors(card, buff, sector, count);
     if (unlikely(err != ESP_OK)) {
-        ESP_LOGE(TAG, "sdmmc_write_blocks failed (%d)", err);
+        ESP_LOGE(TAG, "sdmmc_write_blocks failed %s", esp_err_to_name(err));
         return RES_ERROR;
     }
     return RES_OK;

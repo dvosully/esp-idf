@@ -73,7 +73,7 @@ esp_err_t sdmmc_io_reset(sdmmc_card_t* card)
         ESP_LOGD(TAG, "%s: card not present", __func__);
         return err;
     } else if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: unexpected return: 0x%x", __func__, err );
+        ESP_LOGE(TAG, "%s: unexpected return: %s", __func__, esp_err_to_name(err) );
         return err;
     }
     return ESP_OK;
@@ -105,12 +105,12 @@ esp_err_t sdmmc_init_io(sdmmc_card_t* card)
         host_ocr &= card->ocr;
         err = sdmmc_io_send_op_cond(card, host_ocr, &card->ocr);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "%s: sdmmc_io_send_op_cond (1) returned 0x%x", __func__, err);
+            ESP_LOGE(TAG, "%s: sdmmc_io_send_op_cond (1) returned %s", __func__, esp_err_to_name(err));
             return err;
         }
         err = sdmmc_io_enable_int(card);
         if (err != ESP_OK) {
-            ESP_LOGD(TAG, "%s: sdmmc_enable_int failed (0x%x)", __func__, err);
+            ESP_LOGD(TAG, "%s: sdmmc_enable_int failed %s", __func__, esp_err_to_name(err));
         }
     }
     return ESP_OK;
@@ -165,7 +165,7 @@ esp_err_t sdmmc_io_enable_hs_mode(sdmmc_card_t* card)
     esp_err_t err = sdmmc_io_rw_direct(card, 0, SD_IO_CCCR_HIGHSPEED,
             SD_ARG_CMD52_WRITE | SD_ARG_CMD52_EXCHANGE, &val);
     if (err != ESP_OK) {
-        ESP_LOGD(TAG, "%s: sdmmc_io_rw_direct returned 0x%x", __func__, err);
+        ESP_LOGD(TAG, "%s: sdmmc_io_rw_direct returned %s", __func__, esp_err_to_name(err));
         return err;
     }
 
@@ -222,7 +222,7 @@ esp_err_t sdmmc_io_rw_direct(sdmmc_card_t* card, int func,
 
     err = sdmmc_send_cmd(card, &cmd);
     if (err != ESP_OK) {
-        ESP_LOGV(TAG, "%s: sdmmc_send_cmd returned 0x%x", __func__, err);
+        ESP_LOGV(TAG, "%s: sdmmc_send_cmd returned %s", __func__, esp_err_to_name(err));
         return err;
     }
 
@@ -302,7 +302,7 @@ esp_err_t sdmmc_io_rw_extended(sdmmc_card_t* card, int func,
 
     err = sdmmc_send_cmd(card, &cmd);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: sdmmc_send_cmd returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: sdmmc_send_cmd returned %s", __func__, esp_err_to_name(err));
         return err;
     }
 
