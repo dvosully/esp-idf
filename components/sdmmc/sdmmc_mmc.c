@@ -43,7 +43,7 @@ esp_err_t sdmmc_init_mmc_read_ext_csd(sdmmc_card_t* card)
     /* read EXT_CSD */
     err = sdmmc_mmc_send_ext_csd_data(card, ext_csd, EXT_CSD_MMC_SIZE);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: send_ext_csd_data error 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_ext_csd_data error %s", __func__, esp_err_to_name(err));
         goto out;
     }
     card_type = ext_csd[EXT_CSD_CARD_TYPE];
@@ -240,7 +240,7 @@ esp_err_t sdmmc_init_mmc_check_csd(sdmmc_card_t* card)
     //Deselect it first.
     err = sdmmc_send_cmd_select_card(card, 0);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: select_card returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: select_card returned %s", __func__, esp_err_to_name(err));
         return err;
     }
 
@@ -249,14 +249,14 @@ esp_err_t sdmmc_init_mmc_check_csd(sdmmc_card_t* card)
        is OK. */
     err = sdmmc_send_cmd_send_csd(card, &csd);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: send_csd returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_csd returned %s", __func__, esp_err_to_name(err));
         return err;
     }
 
     //Select the card again
     err = sdmmc_send_cmd_select_card(card, card->rca);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: select_card returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: select_card returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     return ESP_OK;
