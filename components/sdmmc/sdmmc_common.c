@@ -42,13 +42,13 @@ esp_err_t sdmmc_init_ocr(sdmmc_card_t* card)
     }
 
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: send_op_cond (1) returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_op_cond (1) returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     if (host_is_spi(card)) {
         err = sdmmc_send_cmd_read_ocr(card, &card->ocr);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "%s: read_ocr returned 0x%x", __func__, err);
+            ESP_LOGE(TAG, "%s: read_ocr returned %s", __func__, esp_err_to_name(err));
             return err;
         }
     }
@@ -70,13 +70,13 @@ esp_err_t sdmmc_init_cid(sdmmc_card_t* card)
     if (!host_is_spi(card)) {
         err = sdmmc_send_cmd_all_send_cid(card, &raw_cid);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "%s: all_send_cid returned 0x%x", __func__, err);
+            ESP_LOGE(TAG, "%s: all_send_cid returned %s", __func__, esp_err_to_name(err));
             return err;
         }
         if (!card->is_mmc) {
             err = sdmmc_decode_cid(raw_cid, &card->cid);
             if (err != ESP_OK) {
-                ESP_LOGE(TAG, "%s: decoding CID failed (0x%x)", __func__, err);
+                ESP_LOGE(TAG, "%s: decoding CID failed %s", __func__, esp_err_to_name(err));
                 return err;
             }
         } else {
@@ -91,7 +91,7 @@ esp_err_t sdmmc_init_cid(sdmmc_card_t* card)
     } else {
         err = sdmmc_send_cmd_send_cid(card, &card->cid);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "%s: send_cid returned 0x%x", __func__, err);
+            ESP_LOGE(TAG, "%s: send_cid returned %s", __func__, esp_err_to_name(err));
             return err;
         }
     }
@@ -103,7 +103,7 @@ esp_err_t sdmmc_init_rca(sdmmc_card_t* card)
     esp_err_t err;
     err = sdmmc_send_cmd_set_relative_addr(card, &card->rca);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: set_relative_addr returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: set_relative_addr returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     return ESP_OK;
@@ -116,7 +116,7 @@ esp_err_t sdmmc_init_mmc_decode_cid(sdmmc_card_t* card)
     memcpy(raw_cid, card->raw_cid, sizeof(raw_cid));
     err = sdmmc_mmc_decode_cid(card->csd.mmc_ver, raw_cid, &card->cid);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: decoding CID failed (0x%x)", __func__, err);
+        ESP_LOGE(TAG, "%s: decoding CID failed %s", __func__, esp_err_to_name(err));
         return err;
     }
     return ESP_OK;
@@ -128,7 +128,7 @@ esp_err_t sdmmc_init_csd(sdmmc_card_t* card)
     /* Get and decode the contents of CSD register. Determine card capacity. */
     esp_err_t err = sdmmc_send_cmd_send_csd(card, &card->csd);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: send_csd returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_csd returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     const size_t max_sdsc_capacity = UINT32_MAX / card->csd.sector_size + 1;
@@ -146,7 +146,7 @@ esp_err_t sdmmc_init_select_card(sdmmc_card_t* card)
     assert(!host_is_spi(card));
     esp_err_t err = sdmmc_send_cmd_select_card(card, card->rca);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: select_card returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: select_card returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     return ESP_OK;
@@ -186,7 +186,7 @@ esp_err_t sdmmc_init_host_bus_width(sdmmc_card_t* card)
     if (bus_width > 1) {
         esp_err_t err = (*card->host.set_bus_width)(card->host.slot, bus_width);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "host.set_bus_width failed (0x%x)", err);
+            ESP_LOGE(TAG, "host.set_bus_width failed %s", esp_err_to_name(err));
             return err;
         }
     }
@@ -222,7 +222,7 @@ esp_err_t sdmmc_init_host_frequency(sdmmc_card_t* card)
     if (selected_freq > SDMMC_FREQ_PROBING) {
         esp_err_t err = (*card->host.set_card_clk)(card->host.slot, selected_freq);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "failed to switch bus frequency (0x%x)", err);
+            ESP_LOGE(TAG, "failed to switch bus frequency %s", esp_err_to_name(err));
             return err;
         }
     }
@@ -234,7 +234,7 @@ esp_err_t sdmmc_init_host_frequency(sdmmc_card_t* card)
         }
         esp_err_t err = (*card->host.set_bus_ddr_mode)(card->host.slot, true);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "failed to switch bus to DDR mode (0x%x)", err);
+            ESP_LOGE(TAG, "failed to switch bus to DDR mode %s", esp_err_to_name(err));
             return err;
         }
     }

@@ -34,7 +34,7 @@ esp_err_t sdmmc_init_sd_if_cond(sdmmc_card_t* card)
     } else if (host_is_spi(card) && err == ESP_ERR_NOT_SUPPORTED) {
         ESP_LOGD(TAG, "CMD8 rejected; not an SD v2.00 card");
     } else {
-        ESP_LOGE(TAG, "%s: send_if_cond (1) returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_if_cond (1) returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     card->ocr = host_ocr;
@@ -50,7 +50,7 @@ esp_err_t sdmmc_init_sd_blocklen(sdmmc_card_t* card)
     if ((card->ocr & SD_OCR_SDHC_CAP) == 0) {
         esp_err_t err = sdmmc_send_cmd_set_blocklen(card, &card->csd);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "%s: set_blocklen returned 0x%x", __func__, err);
+            ESP_LOGE(TAG, "%s: set_blocklen returned %s", __func__, esp_err_to_name(err));
             return err;
         }
     }
@@ -67,7 +67,7 @@ esp_err_t sdmmc_init_sd_scr(sdmmc_card_t* card)
      */
     err = sdmmc_send_cmd_send_scr(card, &card->scr);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: send_scr (1) returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_scr (1) returned %s", __func__, esp_err_to_name(err));
         return err;
     }
 
@@ -127,7 +127,7 @@ esp_err_t sdmmc_init_sd_bus_width(sdmmc_card_t* card)
     }
     esp_err_t err = sdmmc_send_cmd_set_bus_width(card, width);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "set_bus_width failed (0x%x)", err);
+        ESP_LOGE(TAG, "set_bus_width failed %s", esp_err_to_name(err));
         return err;
     }
     return ESP_OK;
@@ -186,7 +186,7 @@ esp_err_t sdmmc_send_cmd_switch_func(sdmmc_card_t* card,
 
     esp_err_t err = sdmmc_send_cmd(card, &cmd);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: sdmmc_send_cmd returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: sdmmc_send_cmd returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     sdmmc_flip_byte_order(resp->data, sizeof(sdmmc_switch_func_rsp_t));
@@ -225,7 +225,7 @@ esp_err_t sdmmc_enable_hs_mode(sdmmc_card_t* card)
 
     esp_err_t err = sdmmc_send_cmd_switch_func(card, 0, SD_ACCESS_MODE, 0, response);
     if (err != ESP_OK) {
-        ESP_LOGD(TAG, "%s: sdmmc_send_cmd_switch_func (1) returned 0x%x", __func__, err);
+        ESP_LOGD(TAG, "%s: sdmmc_send_cmd_switch_func (1) returned %s", __func__, esp_err_to_name(err));
         goto out;
     }
     uint32_t supported_mask = SD_SFUNC_SUPPORTED(response->data, 1);
@@ -235,7 +235,7 @@ esp_err_t sdmmc_enable_hs_mode(sdmmc_card_t* card)
     }
     err = sdmmc_send_cmd_switch_func(card, 1, SD_ACCESS_MODE, SD_ACCESS_MODE_SDR25, response);
     if (err != ESP_OK) {
-        ESP_LOGD(TAG, "%s: sdmmc_send_cmd_switch_func (2) returned 0x%x", __func__, err);
+        ESP_LOGD(TAG, "%s: sdmmc_send_cmd_switch_func (2) returned %s", __func__, esp_err_to_name(err));
         goto out;
     }
 
@@ -270,19 +270,19 @@ esp_err_t sdmmc_enable_hs_mode_and_check(sdmmc_card_t* card)
     if (!is_spi) {
         err = sdmmc_send_cmd_select_card(card, 0);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "%s: select_card (1) returned 0x%x", __func__, err);
+            ESP_LOGE(TAG, "%s: select_card (1) returned %s", __func__, esp_err_to_name(err));
             return err;
         }
     }
     err = sdmmc_send_cmd_send_csd(card, &card->csd);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: send_csd returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_csd returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     if (!is_spi) {
         err = sdmmc_send_cmd_select_card(card, card->rca);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "%s: select_card (2) returned 0x%x", __func__, err);
+            ESP_LOGE(TAG, "%s: select_card (2) returned %s", __func__, esp_err_to_name(err));
             return err;
         }
     }
@@ -305,7 +305,7 @@ esp_err_t sdmmc_check_scr(sdmmc_card_t* card)
     sdmmc_scr_t scr_tmp = { 0 };
     esp_err_t err = sdmmc_send_cmd_send_scr(card, &scr_tmp);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: send_scr returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_scr returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     if (memcmp(&card->scr, &scr_tmp, sizeof(scr_tmp)) != 0) {
@@ -324,7 +324,7 @@ esp_err_t sdmmc_init_spi_crc(sdmmc_card_t* card)
     assert(host_is_spi(card));
     esp_err_t err = sdmmc_send_cmd_crc_on_off(card, true);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: sdmmc_send_cmd_crc_on_off returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: sdmmc_send_cmd_crc_on_off returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     return ESP_OK;

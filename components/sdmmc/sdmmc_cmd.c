@@ -130,10 +130,10 @@ esp_err_t sdmmc_send_cmd_send_op_cond(sdmmc_card_t* card, uint32_t ocr, uint32_t
 
         if (err != ESP_OK) {
             if (--err_cnt == 0) {
-                ESP_LOGD(TAG, "%s: sdmmc_send_app_cmd err=0x%x", __func__, err);
+                ESP_LOGD(TAG, "%s: sdmmc_send_app_cmd err=%s", __func__, esp_err_to_name(err));
                 return err;
             } else {
-                ESP_LOGV(TAG, "%s: ignoring err=0x%x", __func__, err);
+                ESP_LOGV(TAG, "%s: ignoring err=%s", __func__, esp_err_to_name(err));
                 continue;
             }
         }
@@ -413,7 +413,7 @@ esp_err_t sdmmc_write_sectors_dma(sdmmc_card_t* card, const void* src,
     }
     esp_err_t err = sdmmc_send_cmd(card, &cmd);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: sdmmc_send_cmd returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: sdmmc_send_cmd returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     uint32_t status = 0;
@@ -509,7 +509,7 @@ esp_err_t sdmmc_read_sectors_dma(sdmmc_card_t* card, void* dst,
     }
     esp_err_t err = sdmmc_send_cmd(card, &cmd);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: sdmmc_send_cmd returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: sdmmc_send_cmd returned %s", __func__, esp_err_to_name(err));
         return err;
     }
     uint32_t status = 0;

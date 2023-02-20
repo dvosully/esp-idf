@@ -43,7 +43,7 @@ esp_err_t sdmmc_init_mmc_read_ext_csd(sdmmc_card_t* card)
     /* read EXT_CSD */
     err = sdmmc_mmc_send_ext_csd_data(card, ext_csd, EXT_CSD_MMC_SIZE);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: send_ext_csd_data error 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_ext_csd_data error %s", __func__, esp_err_to_name(err));
         goto out;
     }
     card_type = ext_csd[EXT_CSD_CARD_TYPE];
@@ -107,8 +107,8 @@ esp_err_t sdmmc_init_mmc_bus_width(sdmmc_card_t* card)
         err = sdmmc_mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
                 EXT_CSD_POWER_CLASS, card->ext_csd.power_class);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "%s: can't change power class (%d bit), 0x%x"
-                    , __func__, card->ext_csd.power_class, err);
+            ESP_LOGE(TAG, "%s: can't change power class (%d bit), %s"
+                    , __func__, card->ext_csd.power_class, esp_err_to_name(err));
             return err;
         }
     }
@@ -134,8 +134,8 @@ esp_err_t sdmmc_init_mmc_bus_width(sdmmc_card_t* card)
         err = sdmmc_mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
                 EXT_CSD_BUS_WIDTH, csd_bus_width_value);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "%s: can't change bus width (%d bit), 0x%x",
-                    __func__, bus_width, err);
+            ESP_LOGE(TAG, "%s: can't change bus width (%d bit), %s",
+                    __func__, bus_width, esp_err_to_name(err));
             return err;
         }
     }
@@ -150,8 +150,8 @@ esp_err_t sdmmc_mmc_enable_hs_mode(sdmmc_card_t* card)
         err = sdmmc_mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
                 EXT_CSD_HS_TIMING, EXT_CSD_HS_TIMING_HS);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "%s: mmc_switch EXT_CSD_HS_TIMING_HS error 0x%x",
-                    __func__, err);
+            ESP_LOGE(TAG, "%s: mmc_switch EXT_CSD_HS_TIMING_HS error %s",
+                    __func__, esp_err_to_name(err));
             return err;
         }
     }
@@ -260,7 +260,7 @@ esp_err_t sdmmc_init_mmc_check_ext_csd(sdmmc_card_t* card)
     uint32_t status;
     esp_err_t err = sdmmc_send_cmd_send_status(card, &status);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: send_status returned 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_status returned %s", __func__, esp_err_to_name(err));
         goto out;
     }
     status = ((status & MMC_R1_CURRENT_STATE_MASK) >> MMC_R1_CURRENT_STATE_POS);
@@ -273,7 +273,7 @@ esp_err_t sdmmc_init_mmc_check_ext_csd(sdmmc_card_t* card)
     /* read EXT_CSD to ensure device works fine in HS mode */
     err = sdmmc_mmc_send_ext_csd_data(card, ext_csd, EXT_CSD_MMC_SIZE);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "%s: send_ext_csd_data error 0x%x", __func__, err);
+        ESP_LOGE(TAG, "%s: send_ext_csd_data error %s", __func__, esp_err_to_name(err));
         goto out;
     }
 

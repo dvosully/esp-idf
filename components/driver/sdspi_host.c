@@ -328,7 +328,7 @@ esp_err_t sdspi_host_init_device(const sdspi_device_config_t* slot_config, sdspi
     // Attach the SD card to the SPI bus
     esp_err_t ret = configure_spi_dev(slot, SDMMC_FREQ_PROBING * 1000);
     if (ret != ESP_OK) {
-        ESP_LOGD(TAG, "spi_bus_add_device failed with rc=0x%x", ret);
+        ESP_LOGD(TAG, "spi_bus_add_device failed with %s", esp_err_to_name(ret));
         goto cleanup;
     }
 
@@ -347,7 +347,7 @@ esp_err_t sdspi_host_init_device(const sdspi_device_config_t* slot_config, sdspi
     if (slot->gpio_cs != GPIO_UNUSED) {
         ret = gpio_config(&io_conf);
         if (ret != ESP_OK) {
-            ESP_LOGD(TAG, "gpio_config (CS) failed with rc=0x%x", ret);
+            ESP_LOGD(TAG, "gpio_config (CS) failed with %s", esp_err_to_name(ret));
             goto cleanup;
         }
         cs_high(slot);
@@ -377,7 +377,7 @@ esp_err_t sdspi_host_init_device(const sdspi_device_config_t* slot_config, sdspi
     if (io_conf.pin_bit_mask != 0) {
         ret = gpio_config(&io_conf);
         if (ret != ESP_OK) {
-            ESP_LOGD(TAG, "gpio_config (CD/WP) failed with rc=0x%x", ret);
+            ESP_LOGD(TAG, "gpio_config (CD/WP) failed with %s", esp_err_to_name(ret));
             goto cleanup;
         }
     }
@@ -392,7 +392,7 @@ esp_err_t sdspi_host_init_device(const sdspi_device_config_t* slot_config, sdspi
         };
         ret = gpio_config(&io_conf);
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "gpio_config (interrupt) failed with rc=0x%x", ret);
+            ESP_LOGE(TAG, "gpio_config (interrupt) failed with %s", esp_err_to_name(ret));
             goto cleanup;
         }
 
@@ -408,7 +408,7 @@ esp_err_t sdspi_host_init_device(const sdspi_device_config_t* slot_config, sdspi
         // 3. the gpio_int member should be filled before the ISR is registered
         ret = gpio_isr_handler_add(slot->gpio_int, &gpio_intr, slot);
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "gpio_isr_handle_add failed with rc=0x%x", ret);
+            ESP_LOGE(TAG, "gpio_isr_handle_add failed with %s", esp_err_to_name(ret));
             goto cleanup;
         }
     } else {
@@ -480,7 +480,7 @@ esp_err_t sdspi_host_start_command(sdspi_dev_handle_t handle, sdspi_hw_cmd_t *cm
     spi_device_release_bus(slot->spi_handle);
 
     if (ret != ESP_OK) {
-        ESP_LOGD(TAG, "%s: cmd=%d error=0x%x", __func__, cmd_index, ret);
+        ESP_LOGD(TAG, "%s: cmd=%d error=%s", __func__, cmd_index, esp_err_to_name(ret));
     } else {
         // Update internal state when some commands are sent successfully
         if (cmd_index == SD_CRC_ON_OFF) {
@@ -523,7 +523,7 @@ static esp_err_t start_command_default(slot_info_t *slot, int flags, sdspi_hw_cm
         cmd->r1 = 0xff;
     }
     if (ret != ESP_OK) {
-        ESP_LOGD(TAG, "%s: spi_device_polling_transmit returned 0x%x", __func__, ret);
+        ESP_LOGD(TAG, "%s: spi_device_polling_transmit returned %s", __func__, esp_err_to_name(ret));
         return ret;
     }
     if (flags & SDSPI_CMD_FLAG_NORSP) {
@@ -688,6 +688,7 @@ static esp_err_t shift_cmd_response(sdspi_hw_cmd_t* cmd, int sent_bytes)
 static esp_err_t start_command_read_blocks(slot_info_t *slot, sdspi_hw_cmd_t *cmd,
         uint8_t *data, uint32_t rx_length, bool need_stop_command)
 {
+    uint8_t cmd_index = cmd->cmd_index;
     spi_transaction_t t_command = {
         .length = (SDSPI_CMD_R1_SIZE + SDSPI_RESPONSE_MAX_DELAY) * 8,
         .tx_buffer = cmd,
@@ -713,6 +714,10 @@ static esp_err_t start_command_read_blocks(slot_info_t *slot, sdspi_hw_cmd_t *cm
     if (cmd->r1 & SD_SPI_R1_NO_RESPONSE) {
         ESP_LOGD(TAG, "no response token found");
         return ESP_ERR_TIMEOUT;
+    }
+    if (cmd->r1 & (SD_SPI_R1_ILLEGAL_CMD | SD_SPI_R1_CMD_CRC_ERR | SD_SPI_R1_ADDR_ERR)) {
+        ESP_LOGE(TAG, "CMD %02d NAK 0x%02x", cmd_index, cmd->r1);
+        return ESP_ERR_INVALID_RESPONSE;
     }
 
     while (rx_length > 0) {
@@ -842,7 +847,7 @@ static esp_err_t start_command_write_blocks(slot_info_t *slot, sdspi_hw_cmd_t *c
     // check if command response valid
     ret = shift_cmd_response(cmd, send_bytes);
     if (ret != ESP_OK) {
-        ESP_LOGD(TAG, "%s: check_cmd_response returned 0x%x", __func__, ret);
+        ESP_LOGD(TAG, "%s: check_cmd_response returned %s", __func__, esp_err_to_name(ret));
         return ret;
     }
 
