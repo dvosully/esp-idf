@@ -131,6 +131,8 @@ void rtc_sleep_init(rtc_sleep_config_t cfg)
     }
 
     if (cfg.wifi_pd_en) {
+        REG_CLR_BIT(RTC_CNTL_DIG_ISO_REG, RTC_CNTL_WIFI_FORCE_NOISO | RTC_CNTL_WIFI_FORCE_ISO);
+        REG_CLR_BIT(RTC_CNTL_DIG_PWC_REG, RTC_CNTL_WIFI_FORCE_PU);
         SET_PERI_REG_MASK(RTC_CNTL_DIG_PWC_REG, RTC_CNTL_WIFI_PD_EN);
     } else {
         CLEAR_PERI_REG_MASK(RTC_CNTL_DIG_PWC_REG, RTC_CNTL_WIFI_PD_EN);
@@ -154,7 +156,6 @@ void rtc_sleep_init(rtc_sleep_config_t cfg)
         CLEAR_PERI_REG_MASK(RTC_CNTL_ANA_CONF_REG,
                             RTC_CNTL_CKGEN_I2C_PU | RTC_CNTL_PLL_I2C_PU |
                             RTC_CNTL_RFRX_PBUS_PU | RTC_CNTL_TXRF_I2C_PU);
-        CLEAR_PERI_REG_MASK(RTC_CNTL_OPTIONS0_REG, RTC_CNTL_BB_I2C_FORCE_PU);
     } else {
         SET_PERI_REG_MASK(RTC_CNTL_REG, RTC_CNTL_REGULATOR_FORCE_PU);
         CLEAR_PERI_REG_MASK(RTC_CNTL_DIG_PWC_REG, RTC_CNTL_DG_WRAP_PD_EN);

@@ -5,6 +5,7 @@
  */
 
 #include <string.h>
+#include <inttypes.h>
 
 #include "utils/includes.h"
 #include "common.h"
@@ -147,12 +148,12 @@ void wps_task(void *pvParameters )
                 if (s_wps_sig_cnt[e->sig]) {
                     s_wps_sig_cnt[e->sig]--;
                 } else {
-                    wpa_printf(MSG_ERROR, "wpsT: invalid sig cnt, sig=%d cnt=%d", e->sig, s_wps_sig_cnt[e->sig]);
+                    wpa_printf(MSG_ERROR, "wpsT: invalid sig cnt, sig=%" PRId32 " cnt=%d", e->sig, s_wps_sig_cnt[e->sig]);
                 }
                 DATA_MUTEX_GIVE();
             }
 
-            wpa_printf(MSG_DEBUG, "wpsT: rx sig=%d", e->sig);
+            wpa_printf(MSG_DEBUG, "wpsT: rx sig=%" PRId32 "", e->sig);
 
             switch (e->sig) {
             case SIG_WPS_ENABLE:
@@ -160,7 +161,7 @@ void wps_task(void *pvParameters )
             case SIG_WPS_START:
                 param = (wps_ioctl_param_t *)e->par;
                 if (!param) {
-                    wpa_printf(MSG_ERROR, "wpsT: invalid param sig=%d", e->sig);
+                    wpa_printf(MSG_ERROR, "wpsT: invalid param sig=%" PRId32 "", e->sig);
                     os_semphr_give(s_wps_api_sem);
                     break;
                 }
@@ -209,7 +210,7 @@ void wps_task(void *pvParameters )
                 break;
 
             default:
-                wpa_printf(MSG_ERROR, "wpsT: invalid sig=%d", e->sig);
+                wpa_printf(MSG_ERROR, "wpsT: invalid sig=%" PRId32 "", e->sig);
                 break;
             }
             os_free(e);
@@ -228,11 +229,11 @@ void wps_task(void *pvParameters )
  */
 int wps_post(uint32_t sig, uint32_t par)
 {
-    wpa_printf(MSG_DEBUG, "wps post: sig=%d cnt=%d", sig, s_wps_sig_cnt[sig]);
+    wpa_printf(MSG_DEBUG, "wps post: sig=%" PRId32 " cnt=%d", sig, s_wps_sig_cnt[sig]);
 
     DATA_MUTEX_TAKE();
     if (s_wps_sig_cnt[sig]) {
-        wpa_printf(MSG_DEBUG, "wps post: sig=%d processing", sig);
+        wpa_printf(MSG_DEBUG, "wps post: sig=%" PRId32 " processing", sig);
         DATA_MUTEX_GIVE();
         return ESP_OK;
     } else {
@@ -570,6 +571,20 @@ int wps_process_wps_mX_req(u8 *ubuf, int len, enum wps_process_res *res)
     expd = (struct eap_expand *) ubuf;
     wpa_printf(MSG_DEBUG, "wps process mX req: len %d, tlen %d", len, tlen);
 
+    if (sm->state == WAIT_START) {
+        if (expd->opcode != WSC_Start) {
+            wpa_printf(MSG_DEBUG, "EAP-WSC: Unexpected Op-Code %d "
+                   "in WAIT_START state", expd->opcode);
+            return ESP_FAIL;
+        }
+        wpa_printf(MSG_DEBUG, "EAP-WSC: Received start");
+        sm->state = WPA_MESG;
+    } else if (expd->opcode == WSC_Start){
+        wpa_printf(MSG_DEBUG, "EAP-WSC: Unexpected Op-Code %d",
+                expd->opcode);
+        return ESP_FAIL;
+    }
+
     flag = *(u8 *)(ubuf + sizeof(struct eap_expand));
     if (flag & WPS_MSG_FLAG_LEN) {
         tbuf = ubuf + sizeof(struct eap_expand) + 1 + 2;//two bytes total length
@@ -620,6 +635,10 @@ int wps_process_wps_mX_req(u8 *ubuf, int len, enum wps_process_res *res)
         *res = wps_enrollee_process_msg(sm->wps, expd->opcode, wps_buf);
     } else {
         wps_enrollee_process_msg(sm->wps, expd->opcode, wps_buf);
+    }
+
+    if (res && *res == WPS_FAILURE) {
+        sm->state = WPA_FAIL;
     }
 
     if (wps_buf) {
@@ -757,6 +776,7 @@ int wps_stop_process(wifi_event_sta_wps_fail_reason_t reason_code)
     wps_stop_connection_timers(sm);
     esp_wifi_disconnect();
 
+    sm->state = WPA_FAIL;
     wpa_printf(MSG_DEBUG, "Write wps_fail_information");
 
     esp_event_post(WIFI_EVENT, WIFI_EVENT_STA_WPS_ER_FAILED, &reason_code, sizeof(reason_code), OS_BLOCK);
@@ -847,13 +867,13 @@ int wps_start_msg_timer(void)
 
     if (sm->wps->state == WPS_FINISHED) {
         msg_timeout = 100;
-        wpa_printf(MSG_DEBUG, "start msg timer WPS_FINISHED %d ms", msg_timeout);
+        wpa_printf(MSG_DEBUG, "start msg timer WPS_FINISHED %" PRId32 " ms", msg_timeout);
 	eloop_cancel_timeout(wifi_station_wps_msg_timeout, NULL, NULL);
 	eloop_register_timeout(0, msg_timeout*1000, wifi_station_wps_msg_timeout, NULL, NULL);
         ret = 0;
     } else if (sm->wps->state == RECV_M2) {
         msg_timeout = 5;
-        wpa_printf(MSG_DEBUG, "start msg timer RECV_M2 %d ms", msg_timeout);
+        wpa_printf(MSG_DEBUG, "start msg timer RECV_M2 %" PRId32 " ms", msg_timeout);
 	eloop_cancel_timeout(wifi_station_wps_msg_timeout, NULL, NULL);
 	eloop_register_timeout(msg_timeout, 0, wifi_station_wps_msg_timeout, NULL, NULL);
         ret = 0;
@@ -944,7 +964,7 @@ int wps_sm_rx_eapol_internal(u8 *src_addr, u8 *buf, u32 len)
     eap_len = be_to_host16(ehdr->length);
 
 #ifdef DEBUG_PRINT
-    wpa_printf(MSG_DEBUG, "IEEE 802.1X RX: version=%d type=%d length=%d",
+    wpa_printf(MSG_DEBUG, "IEEE 802.1X RX: version=%d type=%d length=%" PRId32 "",
                hdr->version, hdr->type, plen);
 #endif
 
@@ -1014,7 +1034,7 @@ int wps_sm_rx_eapol_internal(u8 *src_addr, u8 *buf, u32 len)
             eloop_register_timeout(3, 0, wifi_station_wps_eapol_start_handle, NULL, NULL);
             break;
         case EAP_TYPE_EXPANDED:
-            wpa_printf(MSG_DEBUG, "=========expanded plen[%d], %d===========", plen, sizeof(*ehdr));
+            wpa_printf(MSG_DEBUG, "=========expanded plen[%" PRId32 "], %d===========", plen, sizeof(*ehdr));
             if (ehdr->identifier == sm->current_identifier) {
                 ret = 0;
                 wpa_printf(MSG_DEBUG, "wps: ignore overlap identifier");
@@ -1577,15 +1597,16 @@ wifi_wps_scan_done(void *arg, STATUS status)
 
         wpa_printf(MSG_DEBUG, "WPS: neg start");
         esp_wifi_connect();
-	eloop_cancel_timeout(wifi_station_wps_msg_timeout, NULL, NULL);
-	eloop_register_timeout(2, 0, wifi_station_wps_msg_timeout, NULL, NULL);
+        sm->state = WAIT_START;
+        eloop_cancel_timeout(wifi_station_wps_msg_timeout, NULL, NULL);
+        eloop_register_timeout(2, 0, wifi_station_wps_msg_timeout, NULL, NULL);
     } else if (wps_get_status() == WPS_STATUS_SCANNING) {
         if (wps_get_type() == WPS_TYPE_PIN && sm->scan_cnt > WPS_IGNORE_SEL_REG_MAX_CNT) {
             wpa_printf(MSG_INFO, "WPS: ignore selected registrar after %d scans", sm->scan_cnt);
             sm->ignore_sel_reg = true;
         }
         eloop_cancel_timeout(wifi_wps_scan, NULL, NULL);
-	eloop_register_timeout(0, 100*1000, wifi_wps_scan, NULL, NULL);
+        eloop_register_timeout(0, 100*1000, wifi_wps_scan, NULL, NULL);
     } else {
         return;
     }
@@ -1624,7 +1645,7 @@ int wifi_station_wps_start(void)
     struct wps_sm *sm = wps_sm_get();
 
     if (!sm) {
-        wpa_printf(MSG_ERROR, "WPS: wps not initial");
+        wpa_printf(MSG_ERROR, "WPS: wps is not initialized");
         return ESP_FAIL;
     }
 
