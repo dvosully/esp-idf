@@ -122,6 +122,13 @@ menu "Driver Configurations"
                 Also you can forbid the ISR being disabled during flash writing
                 access, by add ESP_INTR_FLAG_IRAM when initializing the driver.
 
+        config SPI_BUS_USE_MUTEX
+            bool "Place mutex around SPI bus transactions"
+            default n
+            help
+                Place a mutex around SPI bus transactions to ensure thread safety
+                when an SPI device is accessed by multiple tasks
+
     endmenu # SPI Configuration
 
     orsource "./twai/Kconfig.twai"

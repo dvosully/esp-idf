@@ -17,6 +17,9 @@
 #if SOC_GDMA_SUPPORTED
 #include "esp_private/gdma.h"
 #endif
+#if CONFIG_SPI_BUS_USE_MUTEX
+#include "freertos/semphr.h"
+#endif
 
 
 #ifdef __cplusplus
@@ -86,6 +89,9 @@ typedef struct {
     spi_bus_lock_handle_t lock;
 #ifdef CONFIG_PM_ENABLE
     esp_pm_lock_handle_t pm_lock;       ///< Power management lock
+#endif
+#if CONFIG_SPI_BUS_USE_MUTEX
+    SemaphoreHandle_t mutex;            ///< Mutex to achieve bus thread safety
 #endif
 } spi_bus_attr_t;
 
