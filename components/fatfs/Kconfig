@@ -1,5 +1,186 @@
 menu "FAT Filesystem support"
 
+    config FATFS_SET_ADVANCED_OPTIONS
+        bool "Set Advanced FatFS Options"
+        default n
+        help
+            This option allows the user to adjust advanced FatFS configuration options.
+            Warning: Some of these options may break the VFS file interface.
+
+
+    config FATFS_READONLY
+        bool "Remove writing API functions"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default n
+        help
+            This option affects FATFS configuration value _FS_READONLY.
+
+            If this option is set, _FS_READONLY is 1.
+            Read-only configuration removes writing API functions, f_write, f_sync,
+            f_unlink, f_mkdir, f_chmod, f_rename, f_truncate, f_getfree and optional
+            writing functions as well.
+
+
+    choice FATFS_CHOOSE_MINIMIZE
+        prompt "Remove some basic API functions writing API functions"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default FATFS_MINIMIZE_0
+        help
+            This option affects FATFS configuration value _FS_MINIMIZE.
+            This option defines minimization level to remove some basic API functions
+            as follows:
+
+            0: All basic API functions are available
+            1: f_stat, f_getfree, f_unlink, f_mkdir, f_chmod, f_utime, f_truncate and
+            f_rename function are removed
+            2: f_opendir, f_readdir and f_closedir function are removed in addition to 1
+            3: f_lseek function is removed in addition to 2
+
+        config FATFS_MINIMIZE_0
+            bool "0 All basic API functions are available"
+        config FATFS_MINIMIZE_1
+            bool "1 Remove f_stat, f_getfree, f_unlink, f_mkdir, f_chmod, f_utime, f_truncate and f_rename"
+        config FATFS_MINIMIZE_2
+            bool "2 Also remove f_opendir, f_readdir and f_closedir"
+        config FATFS_MINIMIZE_3
+            bool "3 Also remove f_lseek"
+
+    endchoice
+
+    config FATFS_MINIMIZE
+        int
+        default 0 if FATFS_MINIMIZE_0
+        default 1 if FATFS_MINIMIZE_1
+        default 2 if FATFS_MINIMIZE_2
+        default 3 if FATFS_MINIMIZE_3
+        default 0
+
+
+    config FATFS_USE_FIND
+        bool "Enable filtered directory read functions, f_findfirst and f_findnext"
+        depends on FATFS_SET_ADVANCED_OPTIONS && (FATFS_MINIMIZE <= 1)
+        default n
+        help
+            Disable or Enable filtered directory read functions, f_findfirst and f_findnext
+            Also _FS_MINIMIZE needs to be 0 or 1
+
+
+    config FATFS_USE_MKFS
+        bool "Enable f_mkfs function"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default y
+
+
+    config FATFS_USE_EXPAND
+        bool "Enable f_expand function"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default n
+
+
+    config FATFS_USE_CHMOD
+        bool "Enable metadata control functions f_chmod and f_utime."
+        depends on FATFS_SET_ADVANCED_OPTIONS && !FATFS_READONLY
+        default y
+        help
+            Disable or Enable fast seek function to enable accelerated mode for f_lseek,
+            f_read and f_write function.
+
+
+    config FATFS_USE_LABEL
+        bool "Enable API functions for volume label f_getlabel and f_setlabel"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default n
+
+
+    config FATFS_USE_FORWARD
+        bool "Enable f_forward function"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default n
+
+
+    choice FATFS_CHOOSE_USE_STRFUNC
+        prompt "Enable string file functions fgets, fputc, fputs and fprintf"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default FATFS_USE_STRFUNC_0
+        help
+            This option switches string functions f_gets, f_putc, f_puts and f_printf.
+            These functions are equivalents of regular string stream I/O functions in POSIX.
+            If sprintf is available and code conversion is not needed, f_write with sprintf
+            will be efficient in code size and performance rather than f_printf.
+            When enable this feature, stdarg.h is included in ff.c
+
+            0: Disable string functions
+            1: Enable string functions without LF-CRLF conversion
+            2: Enable string functions with LF-CRLF conversion
+
+        config FATFS_USE_STRFUNC_0
+            bool "0 Disable string functions"
+        config FATFS_USE_STRFUNC_1
+            bool "1 Enable string functions without LF-CRLF conversion"
+        config FATFS_USE_STRFUNC_2
+            bool "2 Enable string functions with LF-CRLF conversion"
+    endchoice
+
+    config FATFS_USE_STRFUNC
+        int
+        default 0 if FATFS_USE_STRFUNC_0
+        default 1 if FATFS_USE_STRFUNC_1
+        default 2 if FATFS_USE_STRFUNC_2
+        default 0
+
+
+    config FATFS_PRINT_LLI
+        bool "Enable support for long long integer argument in f_printf"
+        depends on FATFS_SET_ADVANCED_OPTIONS && (FATFS_USE_STRFUNC > 0)
+        default n
+        help
+            This option switches support for long long integer argument in f_printf.
+            When enable this feature, C standard needs to be C99 or later.
+
+
+    choice FATFS_CHOOSE_PRINT_FLOAT
+        prompt "Enable support for floating point argument in f_printf"
+        depends on FATFS_SET_ADVANCED_OPTIONS && (FATFS_USE_STRFUNC > 0)
+        default FATFS_PRINT_FLOAT_1
+        help
+            This option switches support for floating point argument in f_printf.
+            When enable this feature, C standard needs to be C99 or later and
+            math.h is included in ff.c
+
+            0: Disable floating point arguments
+            1: Enable floating point arguments in type 'f', 'e' and 'E'.
+            2: Enable it with decimal separator ',' instead of '.'
+
+        config FATFS_PRINT_FLOAT_0
+            bool "0 Disable floating point arguments"
+        config FATFS_PRINT_FLOAT_1
+            bool "1 Enable floating point arguments in type 'f', 'e' and 'E'"
+        config FATFS_PRINT_FLOAT_2
+            bool "2 Enable floating point with decimal separator ',' instead of '.'"
+    endchoice
+
+    config FATFS_PRINT_FLOAT
+        int
+        default 0 if FATFS_PRINT_FLOAT_0
+        default 1 if FATFS_PRINT_FLOAT_1
+        default 2 if FATFS_PRINT_FLOAT_2
+        default 1
+
+
+    config FATFS_STRF_ENCODE
+        int "Convert the f_printf character encoding to selected"
+        depends on FATFS_SET_ADVANCED_OPTIONS && (FATFS_USE_STRFUNC > 0)
+        default 0
+        range 0 3
+        help
+            When character encoding on the API is Unicode (FF_LFN_UNICODE >= 1),
+            string I/O functions enabled by FF_USE_STRFUNC convert the character
+            encoding in it. This option defines the assumption of character
+            encoding _on the file_ to be read/written via those functions.
+            When LFN is not enabled or FF_LFN_UNICODE == 0, the string functions
+            will work without any code conversion and this option has no effect.
+
+
     config FATFS_VOLUME_COUNT
         int "Number of volumes"
         default 2
@@ -137,6 +318,124 @@ menu "FAT Filesystem support"
         config FATFS_API_ENCODING_UTF_8
             bool "API uses UTF-8 encoding"
     endchoice
+
+    choice FATFS_CHOOSE_VOLUME_ID
+        prompt "Support String Volume ID"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default FATFS_VOLUME_ID_0
+        help
+            This option switches the support for string volume ID. When arbitrary string
+            for the volume ID is enabled for the drive prefix, also pre-defined strings
+            by FF_VOLUME_STRS or user defined strings can be used as drive prefix in the
+            path name. Numeric drive number is always valid regardless of this option,
+            and also either format of drive prefix can be enabled by this option.
+
+        config FATFS_VOLUME_ID_0
+            bool "0 Only DOS style numeric prefix supported - 1:/filename"
+        config FATFS_VOLUME_ID_1
+            bool "1 Add DOS style string prefix supported - sdcard:/filename"
+        config FATFS_VOLUME_ID_2
+            bool "2 Add Unix style string prefix supported - /sdcard/filename"
+    endchoice
+
+    config FATFS_VOLUME_ID
+        int
+        default 0 if FATFS_VOLUME_ID_0
+        default 1 if FATFS_VOLUME_ID_1
+        default 2 if FATFS_VOLUME_ID_2
+        default 0
+
+
+    config FATFS_MULTI_PARTITION
+        bool "Enable multi-partition function"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default y
+        help
+            Disable (0) or Enable (1). This option switches multi-partition function.
+            By default (0), each logical drive number is bound to the same physical
+            drive number and only a volume in the physical drive is mounted.
+            When enabled, each logical drive is bound to the partition on the physical
+            drive listed in the user defined partition resolution table VolToPart[].
+            Also f_fdisk funciton will be available.
+
+
+    config FATFS_EXFAT
+        bool "Enable exFAT support. Requires C99"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default n
+        help
+            This option switches support for exFAT filesystem in addition to the
+            FAT/FAT32 filesystem, Enabled (1) or Disabled (0). To enable exFAT,
+            also LFN must be enabled and configureing FF_LFN_UNICODE >= 1 and
+            FF_MAX_LFN == 255 is recommended for full-featured exFAT function.
+            Note that enabling exFAT discards ANSI C (C89) compatibility and
+            wants C99 because of need for 64-bit integer type.
+
+
+    config FATFS_NORTC
+        bool "Disable RTC timestamp metadata"
+        depends on FATFS_SET_ADVANCED_OPTIONS && !FATFS_READONLY
+        default n
+        help
+            Use RTC (0) or Do not use RTC (1). This option controls timestamp feature.
+            If the system does not have an RTC or valid timestamp is not needed, set
+            FF_FS_NORTC to 1 to disable the timestamp function. Every objects modified
+            by FatFs will have a constant timestamp defined by FF_NORTC_MON, FF_NORTC_MDAY
+            and FF_NORTC_YEAR. To use the timestamp featuer, set FF_FS_NORTC == 0 and add
+            get_fattime function to the project to get current time from the RTC.
+            This option has no effect in read-only configuration.
+
+    config FATFS_NORTC_MDAY
+        int "Day to be used as time in no RTC system"
+        depends on FATFS_NORTC
+        default 1
+        range 1 31
+
+    config FATFS_NORTC_MON
+        int "Month to be used as time in no RTC system"
+        depends on FATFS_NORTC
+        default 1
+        range 1 12
+
+    config FATFS_NORTC_YEAR
+        int "Day to be used as time in no RTC system"
+        depends on FATFS_NORTC
+        default 2018
+
+
+    choice FATFS_CHOOSE_NOFSINFO
+        prompt "Configure Usage of FSINFO"
+        depends on FATFS_SET_ADVANCED_OPTIONS
+        default FATFS_NOFSINFO_0
+        help
+            0 to 3. If you need to know correct free space on the FAT32 volume,
+            set bit 0 of this option, and f_getfree function at first time after
+            the volume mounted will force a full FAT scan.
+            Bit 1 controls the use of last allocated cluster number for new allocation.
+
+            bit0=0: Use free cluster count in the FSINFO if available
+            bit0=1: Do not trust free cluster count in the FSINFO.
+            bit1=0: Use last allocated cluster number in the FSINFO to find a free cluster if available
+            bit1=1:Do not trust last allocated cluster number in the FSINFO
+
+        config FATFS_NOFSINFO_0
+            bool "0 Use FSINFO free cluster count and last allocated cluster"
+        config FATFS_NOFSINFO_1
+            bool "1 Do not trust FSINFO free cluster count, do full FAT scan. Use FSINFO last allocated cluster"
+        config FATFS_NOFSINFO_2
+            bool "2 Use FSINFO free cluster count. Do not trust FSINFO last allocated cluster"
+        config FATFS_NOFSINFO_3
+            bool "3 Do not trust FSINFO free cluster count OR last allocated cluster. Do full FAT scan."
+    endchoice
+
+    config FATFS_NOFSINFO
+        int
+        default 0 if FATFS_NOFSINFO_0
+        default 1 if FATFS_NOFSINFO_1
+        default 2 if FATFS_NOFSINFO_2
+        default 3 if FATFS_NOFSINFO_3
+        default 0
+
 
     config FATFS_FS_LOCK
         int "Number of simultaneously open files protected by lock function"

@@ -10,14 +10,22 @@
 / Function Configurations
 /---------------------------------------------------------------------------*/
 
+#ifdef CONFIG_FATFS_READONLY
+#define FF_FS_READONLY	CONFIG_FATFS_READONLY
+#else
 #define FF_FS_READONLY	0
+#endif
 /* This option switches read-only configuration. (0:Read/Write or 1:Read-only)
 /  Read-only configuration removes writing API functions, f_write(), f_sync(),
 /  f_unlink(), f_mkdir(), f_chmod(), f_rename(), f_truncate(), f_getfree()
 /  and optional writing functions as well. */
 
 
+#ifdef CONFIG_FATFS_MINIMIZE
+#define FF_FS_MINIMIZE	CONFIG_FATFS_MINIMIZE
+#else
 #define FF_FS_MINIMIZE	0
+#endif
 /* This option defines minimization level to remove some basic API functions.
 /
 /   0: Basic functions are fully enabled.
@@ -27,41 +35,83 @@
 /   3: f_lseek() function is removed in addition to 2. */
 
 
+#ifdef CONFIG_FATFS_USE_FIND
+#define FF_USE_FIND		CONFIG_FATFS_USE_FIND
+#else
 #define FF_USE_FIND		0
+#endif
 /* This option switches filtered directory read functions, f_findfirst() and
 /  f_findnext(). (0:Disable, 1:Enable 2:Enable with matching altname[] too) */
 
 
+#ifdef CONFIG_FATFS_USE_MKFS
+#define FF_USE_MKFS		CONFIG_FATFS_USE_MKFS
+#else
 #define FF_USE_MKFS		1
+#endif
 /* This option switches f_mkfs() function. (0:Disable or 1:Enable) */
 
 
+#ifdef CONFIG_FATFS_USE_FASTSEEK
 #define FF_USE_FASTSEEK	CONFIG_FATFS_USE_FASTSEEK
+#else
+#define FF_USE_FASTSEEK	0
+#endif
 /* This option switches fast seek function. (0:Disable or 1:Enable) */
 
 
-#define FF_USE_EXPAND	1
+#ifdef CONFIG_FATFS_USE_EXPAND
+#define FF_USE_EXPAND	CONFIG_FATFS_USE_EXPAND
+#else
+#define FF_USE_EXPAND	0
+#endif
 /* This option switches f_expand function. (0:Disable or 1:Enable) */
 
 
+#ifdef CONFIG_FATFS_USE_CHMOD
+#define FF_USE_CHMOD	CONFIG_FATFS_USE_CHMOD
+#else
 #define FF_USE_CHMOD	1
+#endif
 /* This option switches attribute manipulation functions, f_chmod() and f_utime().
 /  (0:Disable or 1:Enable) Also FF_FS_READONLY needs to be 0 to enable this option. */
 
 
+#ifdef CONFIG_FATFS_USE_LABEL
 #define FF_USE_LABEL	CONFIG_FATFS_USE_LABEL
+#else
+#define FF_USE_LABEL	0
+#endif
 /* This option switches volume label functions, f_getlabel() and f_setlabel().
 /  (0:Disable or 1:Enable) */
 
 
+#ifdef CONFIG_FATFS_USE_FORWARD
+#define FF_USE_FORWARD	CONFIG_FATFS_USE_FORWARD
+#else
 #define FF_USE_FORWARD	0
+#endif
 /* This option switches f_forward() function. (0:Disable or 1:Enable) */
 
 
+#ifdef CONFIG_FATFS_USE_STRFUNC
+#define FF_USE_STRFUNC	CONFIG_FATFS_USE_STRFUNC
+#define FF_PRINT_LLI	CONFIG_FATFS_PRINT_LLI
+#define FF_PRINT_FLOAT	CONFIG_FATFS_PRINT_FLOAT
+#define FF_STRF_ENCODE	CONFIG_FATFS_STRF_ENCODE
+#else
 #define FF_USE_STRFUNC	0
 #define FF_PRINT_LLI	0
 #define FF_PRINT_FLOAT	0
 #define FF_STRF_ENCODE	3
+#endif
+/* This option switches string functions, f_gets(), f_putc(), f_puts() and f_printf().
+/
+/  0: Disable string functions.
+/  1: Enable without LF-CRLF conversion.
+/  2: Enable with LF-CRLF conversion. */
+
+
 /* FF_USE_STRFUNC switches string functions, f_gets(), f_putc(), f_puts() and
 /  f_printf().
 /
@@ -200,7 +250,11 @@
 */
 
 
+#ifdef CONFIG_FATFS_MULTI_PARTITION
+#define FF_MULTI_PARTITION	CONFIG_FATFS_MULTI_PARTITION
+#else
 #define FF_MULTI_PARTITION	1
+#endif
 /* This option switches support for multiple volumes on the physical drive.
 /  By default (0), each logical drive number is bound to the same physical drive
 /  number and only an FAT volume found on the physical drive will be mounted.
@@ -251,16 +305,29 @@
 /  buffer in the filesystem object (FATFS) is used for the file data transfer. */
 
 
+#ifdef CONFIG_FATFS_EXFAT
+#define FF_FS_EXFAT		CONFIG_FATFS_EXFAT
+#else
 #define FF_FS_EXFAT		0
+#endif
 /* This option switches support for exFAT filesystem. (0:Disable or 1:Enable)
 /  To enable exFAT, also LFN needs to be enabled. (FF_USE_LFN >= 1)
 /  Note that enabling exFAT discards ANSI C (C89) compatibility. */
 
 
+#ifdef CONFIG_FATFS_NORTC
+#define FF_FS_NORTC		CONFIG_FATFS_NORTC
+#if CONFIG_FATFS_NORTC
+#define FF_NORTC_MON	CONFIG_FATFS_NORTC_MON
+#define FF_NORTC_MDAY	CONFIG_FATFS_NORTC_MDAY
+#define FF_NORTC_YEAR	CONFIG_FATFS_NORTC_YEAR
+#endif
+#else
 #define FF_FS_NORTC		0
 #define FF_NORTC_MON	1
 #define FF_NORTC_MDAY	1
 #define FF_NORTC_YEAR	2022
+#endif
 /* The option FF_FS_NORTC switches timestamp feature. If the system does not have
 /  an RTC or valid timestamp is not needed, set FF_FS_NORTC = 1 to disable the
 /  timestamp feature. Every object modified by FatFs will have a fixed timestamp
@@ -271,7 +338,11 @@
 /  These options have no effect in read-only configuration (FF_FS_READONLY = 1). */
 
 
+#ifdef CONFIG_FATFS_NOFSINFO
+#define FF_FS_NOFSINFO	CONFIG_FATFS_NOFSINFO
+#else
 #define FF_FS_NOFSINFO	0
+#endif
 /* If you need to know correct free space on the FAT32 volume, set bit 0 of this
 /  option, and f_getfree() function at the first time after volume mount will force
 /  a full FAT scan. Bit 1 controls the use of last allocated cluster number.
