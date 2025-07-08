@@ -19,7 +19,13 @@
 #include "deep_sleep_example.h"
 
 #if SOC_RTC_FAST_MEM_SUPPORTED
-static RTC_DATA_ATTR struct timeval sleep_enter_time;
+#if CONFIG_IDF_TARGET_ESP32
+/* APP core of esp32 can't access to RTC FAST MEMORY, do not define it with RTC_IRAM_ATTR */
+RTC_SLOW_ATTR
+#else
+RTC_DATA_ATTR
+#endif
+static struct timeval sleep_enter_time;
 #else
 static struct timeval sleep_enter_time;
 #endif
