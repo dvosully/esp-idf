@@ -21,7 +21,7 @@ menu "ESP Timer (High Resolution Timer)"
     config ESP_TIMER_TASK_STACK_SIZE
         int "High-resolution timer task stack size"
         default 3584
-        range 2048 65536
+        range 1024 65536
         help
             Configure the stack size of "timer_task" task. This task is used
             to dispatch callbacks of timers created using ets_timer and esp_timer
