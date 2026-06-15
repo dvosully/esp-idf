@@ -52,7 +52,11 @@
 /  (0:Disable or 1:Enable) Also FF_FS_READONLY needs to be 0 to enable this option. */
 
 
+#ifdef CONFIG_FATFS_USE_LABEL
 #define FF_USE_LABEL	CONFIG_FATFS_USE_LABEL
+#else
+#define FF_USE_LABEL	0
+#endif
 /* This option switches volume label functions, f_getlabel() and f_setlabel().
 /  (0:Disable or 1:Enable) */
 
@@ -279,7 +283,11 @@
 /  buffer in the filesystem object (FATFS) is used for the file data transfer. */
 
 
+#ifdef CONFIG_FATFS_EXFAT
+#define FF_FS_EXFAT		CONFIG_FATFS_EXFAT
+#else
 #define FF_FS_EXFAT		0
+#endif
 /* This option switches support for exFAT filesystem. (0:Disable or 1:Enable)
 /  To enable exFAT, also LFN needs to be enabled. (FF_USE_LFN >= 1)
 /  Note that enabling exFAT discards ANSI C (C89) compatibility. */

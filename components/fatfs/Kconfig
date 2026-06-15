@@ -311,6 +311,18 @@ menu "FAT Filesystem support"
             This ensures that the link operation is atomic, but may cause performance for large files.
             It may create less fragmented file copy.
 
+    config FATFS_EXFAT
+        bool "Enable exFAT support. Requires C99"
+        default n
+        help
+            This option switches support for exFAT filesystem in addition to the
+            FAT/FAT32 filesystem, Enabled (1) or Disabled (0). To enable exFAT,
+            also LFN must be enabled and configureing FF_LFN_UNICODE >= 1 and
+            FF_MAX_LFN == 255 is recommended for full-featured exFAT function.
+            Note that enabling exFAT discards ANSI C (C89) compatibility and
+            wants C99 because of need for 64-bit integer type.
+
+
     config FATFS_USE_DYN_BUFFERS
         bool "Use dynamic buffers"
         default y
